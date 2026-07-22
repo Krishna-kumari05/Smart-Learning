@@ -1,0 +1,18 @@
+/* Import this file once in main.jsx (after index.css). These are static so
+   Tailwind's class scanner doesn't need to see them dynamically generated. */
+
+.theme-swatch-app {
+  background: linear-gradient(135deg, #12141f, #e8a33d);
+}
+.theme-swatch-ocean {
+  background: linear-gradient(135deg, #0b1f2a, #3ec6b0);
+}
+.theme-swatch-forest {
+  background: linear-gradient(135deg, #141c15, #7fa65c);
+}
+.theme-swatch-galaxy {
+  background: linear-gradient(135deg, #14101f, #9b7ede);
+}
+.theme-swatch-dark {
+  background: linear-gradient(135deg, #0a0a0c, #c9a227);
+}

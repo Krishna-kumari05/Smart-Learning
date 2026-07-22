@@ -1,0 +1,73 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap");
+
+@theme {
+  --color-ink: #12141F;
+  --color-parchment: #F4EFE6;
+  --color-ember: #E8A33D;
+  --color-moss: #5C7A5C;
+  --color-clay: #B5654A;
+
+  --font-display: "Fraunces", serif;
+  --font-body: "Inter", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-parchment);
+  font-family: var(--font-body);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-ember);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@utility input {
+  @apply w-full rounded-lg border px-4 py-3 outline-none transition-colors;
+
+  background-color: rgb(244 239 230 / 5%);
+  border-color: rgb(244 239 230 / 15%);
+  color: var(--color-parchment);
+}
+
+@utility input-focus {
+  border-color: var(--color-ember);
+}
+
+@utility card {
+  @apply rounded-2xl border p-6;
+
+  background-color: rgb(244 239 230 / 5%);
+  border-color: rgb(244 239 230 / 10%);
+}
+
+@utility btn-primary {
+  @apply rounded-lg px-5 py-3 font-semibold transition-all;
+
+  background: var(--color-ember);
+  color: var(--color-ink);
+}
+
+@utility btn-primary-hover {
+  filter: brightness(0.95);
+}
