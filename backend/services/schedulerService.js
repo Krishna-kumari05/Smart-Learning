@@ -3,6 +3,9 @@
 const STUDY_BLOCK_MINUTES = 25;
 const BREAK_BLOCK_MINUTES = 5;
 const BLOCK_CYCLE = STUDY_BLOCK_MINUTES + BREAK_BLOCK_MINUTES;
+// A leftover gap (or a whole short window) at least this long becomes a
+// shorter study block instead of being wasted.
+const MIN_BLOCK_MINUTES = 10;
 
 function timeToMinutes(hhmm) {
   const [h, m] = hhmm.split(":").map(Number);
@@ -105,29 +108,41 @@ function taskFromTopic(topic, start, end) {
   };
 }
 
+// Splits one free-time window into study blocks: full 25-min blocks separated by
+// 5-min breaks, plus one shorter block if the leftover time is >= MIN_BLOCK_MINUTES.
+// So a 15-min window gives one 15-min block, and a 40-min window gives 25 + 10.
+function planBlocksForWindow(start, end) {
+  const from = timeToMinutes(start);
+  const to = windowEndMinutes(start, end);
+  const plan = [];
+  let cursor = from;
+  while (cursor + STUDY_BLOCK_MINUTES <= to) {
+    plan.push({ start: cursor, end: cursor + STUDY_BLOCK_MINUTES });
+    cursor += BLOCK_CYCLE;
+  }
+  const left = to - cursor;
+  if (left >= MIN_BLOCK_MINUTES && left < STUDY_BLOCK_MINUTES) {
+    plan.push({ start: cursor, end: to });
+  }
+  return plan;
+}
+
 // Packs one day's tasks across one or more time windows ("shifts"). Daily/
 // exam mode just passes a single shift; weekend mode can pass several.
 function packDayAcrossShifts(date, shifts, queue, queueIndexRef) {
   const tasks = [];
   shifts.forEach(({ start, end }) => {
-    let cursor = timeToMinutes(start);
-    const shiftEnd = windowEndMinutes(start, end);
-    while (cursor + STUDY_BLOCK_MINUTES <= shiftEnd && queueIndexRef.i < queue.length) {
+    for (const block of planBlocksForWindow(start, end)) {
+      if (queueIndexRef.i >= queue.length) break;
       const topic = queue[queueIndexRef.i++];
-      tasks.push(taskFromTopic(topic, minutesToTime(cursor), minutesToTime(cursor + STUDY_BLOCK_MINUTES)));
-      cursor += BLOCK_CYCLE;
+      tasks.push(taskFromTopic(topic, minutesToTime(block.start), minutesToTime(block.end)));
     }
   });
   return { date: dateStr(date), tasks };
 }
 
 function totalBlocksForShifts(shifts) {
-  return shifts.reduce((sum, { start, end }) => {
-    const mins = windowEndMinutes(start, end) - timeToMinutes(start);
-    // The last study block doesn't need its trailing break, so a window fits
-    // floor((mins + break) / cycle) blocks (e.g. 25 min -> 1, 55 min -> 2).
-    return sum + Math.floor((mins + BREAK_BLOCK_MINUTES) / BLOCK_CYCLE);
-  }, 0);
+  return shifts.reduce((sum, { start, end }) => sum + planBlocksForWindow(start, end).length, 0);
 }
 
 // mode: "daily" (Mon-Fri) uses the user's onboarding free-time window.
@@ -148,7 +163,10 @@ function generateWeekTimetable(user, subjects, mode, customShifts) {
 
   const blocksPerDay = totalBlocksForShifts(shifts);
   if (blocksPerDay === 0) {
-    return { days: [], warning: "That time window is too short to fit a study block." };
+    return {
+      days: [],
+      warning: `Your free-time window (${shifts.map((x) => `${x.start}-${x.end}`).join(", ")}) is too short to fit a study block.`,
+    };
   }
 
   const dates = nextDatesForWeekdays(weekdays, numDays);
@@ -190,7 +208,10 @@ function generateExamTimetable(user, examSubjects) {
   const shifts = [{ start: user.dailyFreeTime.start, end: user.dailyFreeTime.end }];
   const blocksPerDay = totalBlocksForShifts(shifts);
   if (blocksPerDay === 0) {
-    return { days: [], warning: "Your free-time window is too short to fit a study block." };
+    return {
+      days: [],
+      warning: `Your free-time window (${shifts[0].start}-${shifts[0].end}) is too short to fit a study block.`,
+    };
   }
 
   const overallDeadline = examSubjects.reduce(
@@ -218,9 +239,9 @@ function generateExamTimetable(user, examSubjects) {
       .filter(({ t }) => dStr <= dateStr(new Date(t.examDate)));
 
     const tasks = [];
-    let cursor = timeToMinutes(shifts[0].start);
+    const examBlocks = planBlocksForWindow(shifts[0].start, shifts[0].end);
 
-    for (let b = 0; b < blocksPerDay; b++) {
+    for (const block of examBlocks) {
       if (eligible.length === 0) break;
       eligible.forEach(({ idx }) => (credits[idx] += allTopics[idx].weight));
 
@@ -230,11 +251,8 @@ function generateExamTimetable(user, examSubjects) {
       });
 
       const topic = allTopics[best.idx];
-      tasks.push(
-        taskFromTopic(topic, minutesToTime(cursor), minutesToTime(cursor + STUDY_BLOCK_MINUTES))
-      );
+      tasks.push(taskFromTopic(topic, minutesToTime(block.start), minutesToTime(block.end)));
       credits[best.idx] -= totalWeight / allTopics.length;
-      cursor += BLOCK_CYCLE;
     }
 
     days.push({ date: dStr, tasks });
