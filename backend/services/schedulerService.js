@@ -13,6 +13,14 @@ function minutesToTime(mins) {
   const m = mins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
+// End of a window in minutes. If the end is earlier than the start, the window
+// crosses midnight (e.g. 22:00 -> 01:00), so the end falls on the next day.
+// Equal start/end is an empty window.
+function windowEndMinutes(start, end) {
+  const s = timeToMinutes(start);
+  const e = timeToMinutes(end);
+  return e >= s ? e : e + 24 * 60;
+}
 function dateStr(d) {
   return d.toISOString().split("T")[0];
 }
@@ -103,7 +111,7 @@ function packDayAcrossShifts(date, shifts, queue, queueIndexRef) {
   const tasks = [];
   shifts.forEach(({ start, end }) => {
     let cursor = timeToMinutes(start);
-    const shiftEnd = timeToMinutes(end);
+    const shiftEnd = windowEndMinutes(start, end);
     while (cursor + STUDY_BLOCK_MINUTES <= shiftEnd && queueIndexRef.i < queue.length) {
       const topic = queue[queueIndexRef.i++];
       tasks.push(taskFromTopic(topic, minutesToTime(cursor), minutesToTime(cursor + STUDY_BLOCK_MINUTES)));
@@ -115,8 +123,10 @@ function packDayAcrossShifts(date, shifts, queue, queueIndexRef) {
 
 function totalBlocksForShifts(shifts) {
   return shifts.reduce((sum, { start, end }) => {
-    const mins = Math.max(timeToMinutes(end) - timeToMinutes(start), 0);
-    return sum + Math.floor(mins / BLOCK_CYCLE);
+    const mins = windowEndMinutes(start, end) - timeToMinutes(start);
+    // The last study block doesn't need its trailing break, so a window fits
+    // floor((mins + break) / cycle) blocks (e.g. 25 min -> 1, 55 min -> 2).
+    return sum + Math.floor((mins + BREAK_BLOCK_MINUTES) / BLOCK_CYCLE);
   }, 0);
 }
 
